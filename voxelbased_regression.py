@@ -70,6 +70,12 @@ for i in range(dim1):
             intercepts[i, j, k] = model.params[0] 
             p_values[i, j, k] = model.pvalues[1]
 
+# pull unmasked coefficient values and output nifti
+
+#create nifti of all coefficients
+coefficients_nii = new_img_like('DST3050001/swFEOBV.nii', coefficients)
+nib.save(coefficients_nii, "voxel-based correlation coef unmasked.nii")
+
 # cut in x-direction
 sagittal = -25
 # cut in y-direction
