@@ -23,6 +23,16 @@ data_path = '/home/jason/Study_data/Down Syndrome/TRCDS/Raw_images/DSCHOL-A003-2
 
 os.chdir(data_path)
 
+
+#import generic T1 in MNI space to generate mask
+dataset = datasets.fetch_icbm152_2009()
+
+#restrict to voxels within the brain - NEED T1 MR IMAGE
+#create brain mask
+mask_img = compute_epi_mask('DST3050061/swPIB.nii')
+brainmask = image.get_data(mask_img).astype(bool)
+
+
 #Import smoothed/warped nifti files to generate 4D arrays
 PiB_data = image.get_data(['DST3050001/swPIB.nii', 'DST3050002/swPIB.nii',
                            'DST3050003/swPIB.nii', 'DST3050012/swPIB.nii',
@@ -72,6 +82,11 @@ for i in range(dim1):
 
 # pull unmasked coefficient values and output nifti
 
+
+
+#apply brainmask to calculated coefficients
+coef_brain = np.where(brainmask, coefficients, np.nan)
+
 #create nifti of all coefficients
 coefficients_nii = new_img_like('DST3050001/swFEOBV.nii', coefficients)
 nib.save(coefficients_nii, "voxel-based correlation coef unmasked.nii")
@@ -100,12 +115,6 @@ log_p_values[log_p_values < 3] = 0
 # to convert to a new image as output.
 # This new image will have same header information as reference image.   
 #log_p_values_img = new_img_like('DST3050001/swFEOBV.nii', log_p_values)
-
-
-#restrict to voxels within the brain
-#create brain mask
-mask_img = compute_epi_mask('DST3050061/swPIB.nii')
-brainmask = image.get_data(mask_img).astype(bool)
 
 # self-computed pval mask
 bin_p_values = log_p_values != 0
