@@ -25,13 +25,16 @@ os.chdir(data_path)
 
 
 #import generic T1 in MNI space to generate mask
-dataset = datasets.fetch_icbm152_2009()
+mrdata = datasets.fetch_icbm152_2009()
+gmdata = mrdata['gm']
+gmni = image.load_img(gmdata)
+
+mrdim1, mrdim2, mrdim3 = gmni.shape
 
 #restrict to voxels within the brain - NEED T1 MR IMAGE
 #create brain mask
-mask_img = compute_epi_mask('DST3050061/swPIB.nii')
+mask_img = compute_epi_mask(mrdata["gm"])
 brainmask = image.get_data(mask_img).astype(bool)
-
 
 #Import smoothed/warped nifti files to generate 4D arrays
 PiB_data = image.get_data(['DST3050001/swPIB.nii', 'DST3050002/swPIB.nii',
@@ -53,17 +56,51 @@ FEOBV_data = image.get_data(['DST3050001/swFEOBV.nii', 'DST3050002/swFEOBV.nii',
 #get shapes of 4D arrays
 dim1, dim2, dim3, subjects = PiB_data.shape
 
+PiB_data_resampled = np.zeros((mrdim1, mrdim2, mrdim3, subjects))
+FEOBV_data_resampled = np.zeros((mrdim1, mrdim2, mrdim3, subjects))
+
+#resample PET images to match MRI mask
+for i in range(subjects):
+    
+    #select image
+    pib_img = PiB_data[..., i]
+    feobv_img = FEOBV_data[..., i]
+    
+    #convert to nifti for resampling
+    pib_img_ni = new_img_like(
+        'DST3050001/swPIB.nii', pib_img)
+    feobv_img_ni = new_img_like(
+        'DST3050001/swPIB.nii', feobv_img)
+    
+    #resample so voxel size matches MR
+    resampled_pib_img = image.resample_to_img(pib_img_ni, gmni, 
+                                              interpolation='linear')
+    resampled_feobv_img = image.resample_to_img(pib_img_ni, gmni, 
+                                              interpolation='linear')
+    #convert back to array
+    pib_array = image.get_data(resampled_pib_img)
+    feobv_array = image.get_data(resampled_feobv_img)
+    
+    #store in 4D array by subject
+    PiB_data_resampled[..., i] = pib_array
+    FEOBV_data_resampled[..., i] = feobv_array
+    
+#get shape of resampled 4D arrays
+#get shapes of 4D arrays
+rsdim1, rsdim2, rsdim3, subjects = PiB_data_resampled.shape
+
+
 # Initialize arrays to store regression coefficients, p-values and intercepts
-coefficients = np.zeros((dim1, dim2, dim3))
-intercepts = np.zeros((dim1, dim2, dim3))
-p_values = np.ones((dim1, dim2, dim3))
+coefficients = np.zeros((rsdim1, rsdim2, rsdim3))
+intercepts = np.zeros((rsdim1, rsdim2, rsdim3))
+p_values = np.ones((rsdim1, rsdim2, rsdim3))
 
 # Perform linear regression for each cell
-for i in range(dim1):
-    for j in range(dim2):
-        for k in range(dim3):
-            x = PiB_data[i, j, k, :].reshape(-1, 1)
-            y = FEOBV_data[i, j, k, :]
+for i in range(rsdim1):
+    for j in range(rsdim2):
+        for k in range(rsdim3):
+            x = PiB_data_resampled[i, j, k, :].reshape(-1, 1)
+            y = FEOBV_data_resampled[i, j, k, :]
             
             # Skip if all values in x or y are constant
             if np.all(x == x[0]) or np.all(y == y[0]):
