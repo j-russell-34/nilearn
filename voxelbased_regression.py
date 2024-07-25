@@ -16,7 +16,8 @@ from nilearn.masking import compute_epi_mask
 from nilearn import plotting
 import nibabel as nib
 
-
+#set significant p-value threshold for masking
+sig_p = 0.001
 
 #Set path where data is stored
 data_path = '/home/jason/Study_data/Down Syndrome/TRCDS/Raw_images/DSCHOL-A003-2024-07-15a/DATA'
@@ -107,8 +108,8 @@ log_p_values = -np.log10(p_values)
 log_p_values[np.isnan(log_p_values)] = 0.0
 log_p_values[log_p_values > 10.0] = 10.0
        
-#generate mask if p<0.001
-log_p_values[log_p_values < 3] = 0
+#generate mask if p< sig p threshold defined earlier
+log_p_values[log_p_values < -np.log10(sig_p)] = 0
 
 # First argument being a reference image
 # and second argument should be p-values data
