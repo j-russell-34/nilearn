@@ -10,14 +10,14 @@ from nilearn import image
 from nilearn import datasets
 import os
 import numpy as np
-import statsmodels.api as sm
+from scipy.stats import pearsonr
 from nilearn.image import new_img_like
 from nilearn.masking import compute_epi_mask
 from nilearn import plotting
 import nibabel as nib
 
 #set significant p-value threshold for masking
-sig_p = 0.001
+sig_p = 0.005
 
 #Set path where data is stored
 data_path = '/home/jason/Study_data/Down Syndrome/TRCDS/Raw_images/DSCHOL-A003-2024-07-15a/DATA'
@@ -55,52 +55,25 @@ FEOBV_data = image.get_data(['DST3050001/swFEOBV.nii', 'DST3050002/swFEOBV.nii',
 dim1, dim2, dim3, subjects = PiB_data.shape
 
 # Initialize arrays to store regression coefficients, p-values and intercepts
-coefficients = np.zeros((dim1, dim2, dim3))
-intercepts = np.zeros((dim1, dim2, dim3))
+correlations = np.zeros((dim1, dim2, dim3))
 p_values = np.ones((dim1, dim2, dim3))
 
 # Perform linear regression for each cell
 for i in range(dim1):
     for j in range(dim2):
         for k in range(dim3):
-            x = PiB_data[i, j, k, :].reshape(-1, 1)
-            y = FEOBV_data[i, j, k, :]
-            
-            # Skip if all values in x or y are constant
-            if np.all(x == x[0]) or np.all(y == y[0]):
-                continue
-                  
-            # Add a column of ones for the intercept term
-            x_with_intercept = sm.add_constant(x)
-            
-            # Create and fit the model
-            model = sm.OLS(y, x_with_intercept).fit()
-                
-            # Store the coefficients and intercepts
-            coefficients[i, j, k] = model.params[1]
-            intercepts[i, j, k] = model.params[0] 
-            p_values[i, j, k] = model.pvalues[1]
-
-# pull unmasked coefficient values and output nifti
-
+           # Create and fit the model and extract correlation and p-value
+           correlations[i, j, k], p_values[i, j, k] = pearsonr(
+               PiB_data[i,j,k,:], FEOBV_data[i,j,k,:])     
 
 
 #apply brainmask to calculated coefficients
-coef_brain = np.where(brainmask, coefficients, np.nan)
+correl_brain = np.where(brainmask, correlations, np.nan)
 
 #create nifti of all coefficients
-coefficients_nii = new_img_like('DST3050001/swFEOBV.nii', coefficients)
-nib.save(coefficients_nii, "voxel-based correlation coef unmasked.nii")
+correlations_nii = new_img_like('DST3050001/swFEOBV.nii', correlations)
+nib.save(correlations_nii, "voxel-based correlations unmasked.nii")
 
-# cut in x-direction
-sagittal = -25
-# cut in y-direction
-coronal = -37
-# cut in z-direction
-axial = -6
-
-# coordinates displaying should be prepared as a list
-cut_coords = [sagittal, coronal, axial]
 
 # Use a log scale for p-values
 log_p_values = -np.log10(p_values)
@@ -120,26 +93,26 @@ log_p_values[log_p_values < -np.log10(sig_p)] = 0
 # self-computed pval mask
 bin_p_values = log_p_values != 0
 
-bin_p_values_and_mask = np.logical_and(bin_p_values, brainmask)
+#bin_p_values_and_mask = np.logical_and(bin_p_values, brainmask)
 
 
 #Generate Nifti image type
 sig_p_mask_img = new_img_like(
-    'DST3050001/swPIB.nii', bin_p_values_and_mask.astype(int)
+    'DST3050001/swPIB.nii', bin_p_values.astype(int)
 )
 
 
 #apply mask to calculated coefficients
-coef_masked = np.where(bin_p_values_and_mask, coefficients, np.nan)     
+cor_masked = np.where(bin_p_values, correlations, np.nan)     
 
 
 #create nifti of significant coefficients
 
-sig_coefficients = new_img_like('DST3050001/swFEOBV.nii', coef_masked)
+sig_correlations = new_img_like('DST3050001/swFEOBV.nii', cor_masked)
 
 
 #generate mosiac plot of significant coefficients
-plotting.plot_stat_map(sig_coefficients, display_mode="mosaic")
+plotting.plot_stat_map(sig_correlations, display_mode="mosaic")
 
 #export significant coefficients as nifti file
-nib.save(sig_coefficients, "voxel-based correlation.nii")
+nib.save(sig_correlations, "voxel-based correlation.nii")

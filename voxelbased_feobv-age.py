@@ -12,7 +12,7 @@ from nilearn import image
 from nilearn import datasets
 import os
 import numpy as np
-import statsmodels.api as sm
+from scipy.stats import pearsonr
 from nilearn.image import new_img_like
 from nilearn.masking import compute_epi_mask
 from nilearn import plotting
@@ -52,8 +52,8 @@ FEOBV_data = image.get_data(['DST3050001/swFEOBV.nii', 'DST3050002/swFEOBV.nii',
 #get shapes of 4D arrays
 dim1, dim2, dim3, subjects = FEOBV_data.shape
 
-# Initialize arrays to store regression coefficients, p-values and intercepts
-coefficients = np.zeros((dim1, dim2, dim3))
+# Initialize arrays to store regression correlations, p-values and intercepts
+correlations = np.zeros((dim1, dim2, dim3))
 intercepts = np.zeros((dim1, dim2, dim3))
 p_values = np.ones((dim1, dim2, dim3))
 
@@ -61,34 +61,18 @@ p_values = np.ones((dim1, dim2, dim3))
 for i in range(dim1):
     for j in range(dim2):
         for k in range(dim3):
-            x = age_df['age']
-            y = FEOBV_data[i, j, k, :]
-            
-            # Skip if all values in x or y are constant
-            if np.all(x == x[0]) or np.all(y == y[0]):
-                continue
-                  
-            # Add a column of ones for the intercept term
-            x_with_intercept = sm.add_constant(x)
-            
-            # Create and fit the model
-            model = sm.OLS(y, x_with_intercept).fit()
-                
-            # Store the coefficients and intercepts
-            coefficients[i, j, k] = model.params.iloc[1]
-            intercepts[i, j, k] = model.params.iloc[0] 
-            p_values[i, j, k] = model.pvalues.iloc[1]
-
-# pull unmasked coefficient values and output nifti
+            # Create and fit the model and extract correlation and p-value
+            correlations[i, j, k], p_values[i, j, k] = pearsonr(
+                FEOBV_data[i,j,k,:], age_df['age'])    
 
 
 
-#apply brainmask to calculated coefficients
-coef_brain = np.where(brainmask, coefficients, np.nan)
+#apply brainmask to calculated correlations
+corr_brain = np.where(brainmask, correlations, np.nan)
 
-#create nifti of all coefficients
-coefficients_nii = new_img_like('DST3050001/swFEOBV.nii', coefficients)
-nib.save(coefficients_nii, "voxel-based correlation coef unmasked.nii")
+#create nifti of all correlations
+correlations_nii = new_img_like('DST3050001/swFEOBV.nii', correlations)
+nib.save(correlations_nii, "voxel-based correlation coef unmasked.nii")
 
 
 # Use a log scale for p-values
@@ -118,17 +102,17 @@ sig_p_mask_img = new_img_like(
 )
 
 
-#apply mask to calculated coefficients
-coef_masked = np.where(bin_p_values_and_mask, coefficients, np.nan)     
+#apply mask to calculated correlations
+corr_masked = np.where(bin_p_values, correlations, np.nan)     
 
 
-#create nifti of significant coefficients
+#create nifti of significant correlations
 
-sig_coefficients = new_img_like('DST3050001/swFEOBV.nii', coef_masked)
+sig_correlations = new_img_like('DST3050001/swFEOBV.nii', corr_masked)
 
 
-#generate mosiac plot of significant coefficients
-plotting.plot_stat_map(sig_coefficients, display_mode="mosaic")
+#generate mosiac plot of significant correlations
+plotting.plot_stat_map(sig_correlations, display_mode="mosaic")
 
-#export significant coefficients as nifti file
-nib.save(sig_coefficients, "voxel-based age correlation.nii")
+#export significant correlations as nifti file
+nib.save(sig_correlations, "voxel-based age correlation.nii")
