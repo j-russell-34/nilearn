@@ -7,12 +7,10 @@ Script to perform Voxel-wise linear regression between 2 PET tracers
 
 
 from nilearn import image
-from nilearn import datasets
 import os
 import numpy as np
 from scipy.stats import pearsonr
 from nilearn.image import new_img_like
-from nilearn.masking import compute_epi_mask
 from nilearn import plotting
 import nibabel as nib
 
@@ -25,13 +23,8 @@ data_path = '/home/jason/Study_data/Down Syndrome/TRCDS/Raw_images/DSCHOL-A003-2
 os.chdir(data_path)
 
 
-#import generic T1 in MNI space to generate mask
-dataset = datasets.fetch_icbm152_2009()
-
-#restrict to voxels within the brain - NEED T1 MR IMAGE
-#create brain mask
-mask_img = compute_epi_mask('DST3050061/swPIB.nii')
-brainmask = image.get_data(mask_img).astype(bool)
+#import study specific GM mask
+gmmask = image.get_data('study_specific_GM_mask_prob0.3.nii').astype(bool)
 
 
 #Import smoothed/warped nifti files to generate 4D arrays
@@ -67,8 +60,8 @@ for i in range(dim1):
                PiB_data[i,j,k,:], FEOBV_data[i,j,k,:])     
 
 
-#apply brainmask to calculated coefficients
-correl_brain = np.where(brainmask, correlations, np.nan)
+#apply gmmask to calculated coefficients
+correl_brain = np.where(gmmask, correlations, np.nan)
 
 #create nifti of all coefficients
 correlations_nii = new_img_like('DST3050001/swFEOBV.nii', correlations)
@@ -84,16 +77,11 @@ log_p_values[log_p_values > 10.0] = 10.0
 #generate mask if p< sig p threshold defined earlier
 log_p_values[log_p_values < -np.log10(sig_p)] = 0
 
-# First argument being a reference image
-# and second argument should be p-values data
-# to convert to a new image as output.
-# This new image will have same header information as reference image.   
-#log_p_values_img = new_img_like('DST3050001/swFEOBV.nii', log_p_values)
 
 # self-computed pval mask
 bin_p_values = log_p_values != 0
 
-#bin_p_values_and_mask = np.logical_and(bin_p_values, brainmask)
+bin_p_values_and_mask = np.logical_and(bin_p_values, gmmask)
 
 
 #Generate Nifti image type
@@ -103,7 +91,7 @@ sig_p_mask_img = new_img_like(
 
 
 #apply mask to calculated coefficients
-cor_masked = np.where(bin_p_values, correlations, np.nan)     
+cor_masked = np.where(bin_p_values_and_mask, correlations, np.nan)     
 
 
 #create nifti of significant coefficients

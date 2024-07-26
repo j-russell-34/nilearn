@@ -11,6 +11,7 @@ from nilearn.image import new_img_like
 import nibabel as nib
 import os
 import numpy as np
+from scipy.ndimage import binary_dilation
 
 #Set path where data is stored
 data_path = '/home/jason/Study_data/Down Syndrome/TRCDS/Raw_images/DSCHOL-A003-2024-07-15a/DATA'
@@ -49,9 +50,16 @@ for i in range(rsdim1):
             else:
                 prob_mask[i, j, k] = 0
                 
-study_mask_nii = new_img_like('DST3050001/swFEOBV.nii', prob_mask)
 
-nib.save(study_mask_nii, "study_specific_GM_mask_prob0.3.nii")
+                
+
+dil_gm_mask = binary_dilation(prob_mask)
+
+dil_mask_gm_nii = new_img_like(
+    'DST3050001/swFEOBV.nii', dil_gm_mask.astype(int)
+)
+
+nib.save(dil_mask_gm_nii, "study_specific_GM_mask_prob0.3.nii")
             
 
 
