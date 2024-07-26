@@ -8,8 +8,6 @@ Script to Generate Study Specific Mask from Individual T1s
 
 from nilearn import image
 from nilearn.image import new_img_like
-from nilearn.masking import compute_epi_mask
-from nilearn import plotting
 import nibabel as nib
 import os
 import numpy as np
