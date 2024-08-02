@@ -1,8 +1,10 @@
+#!/usr/bin/env python3
+
 # -*- coding: utf-8 -*-
 """
 Spyder Editor
 Author: Jason Russell.
-Script to perform Voxel-wise linear regression between FEOBV and age
+Script to perform Voxel-wise linear regression between FEOBV and centiloid
 """
 
 from nilearn import image
@@ -34,16 +36,16 @@ FEOBV_img_paths = [
 # Load NIfTI images into a 4D image
 FEOBV_imgs = image.concat_imgs([os.path.join(data_path, img) for img in FEOBV_img_paths])
 
-# Import age data
-age_df = pd.read_csv('/home/jason/Study_data/Down Syndrome/TRCDS/DSChol_dems.csv')
+# Import centiloid data
+centiloid_df = pd.read_csv('/home/jason/Study_data/Down Syndrome/TRCDS/DSCHOL_centiloids.csv')
 
-age = age_df['age'].astype(float)
+centiloid = centiloid_df['Centiloid'].astype(float)
 
 dimx, dimy, dimz, subjects = FEOBV_imgs.shape
 
 
 design_matrix = pd.DataFrame({
-    "age": age,
+    "centiloid": centiloid,
     "intercept": np.ones(subjects)
 })
 
@@ -77,11 +79,11 @@ display = plotting.plot_stat_map(
     display_mode="z",
     figure=fig,
 )
-fig.suptitle("age effect on FEOBV uptake (p = 0.005)")
+fig.suptitle("centiloid effect on FEOBV uptake (p = 0.005)")
 plotting.show()
 
 # Save the statistical map
 # Save the thresholded z-map to a NIfTI file
-thresholded_map.to_filename('thresholded_age_effect_z_map.nii')
+thresholded_map.to_filename('thresholded_centiloid_effect_z_map.nii')
 
 
