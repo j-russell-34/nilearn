@@ -9,7 +9,7 @@ Script to perform Voxel-wise linear regression between 2 PET tracers
 from nilearn import image
 import os
 import numpy as np
-from scipy.stats import pearsonr
+from scipy.stats import pearsonr, norm
 from nilearn.image import new_img_like
 from nilearn import plotting
 import nibabel as nib
@@ -50,6 +50,7 @@ dim1, dim2, dim3, subjects = PiB_data.shape
 # Initialize arrays to store regression coefficients, p-values and intercepts
 correlations = np.zeros((dim1, dim2, dim3))
 p_values = np.ones((dim1, dim2, dim3))
+z_scores = np.zeros((dim1, dim2, dim3))
 
 # Perform linear regression for each cell
 for i in range(dim1):
@@ -57,15 +58,18 @@ for i in range(dim1):
         for k in range(dim3):
            # Create and fit the model and extract correlation and p-value
            correlations[i, j, k], p_values[i, j, k] = pearsonr(
-               PiB_data[i,j,k,:], FEOBV_data[i,j,k,:])     
+               PiB_data[i,j,k,:], FEOBV_data[i,j,k,:])   
+           if p_values[i,j,k] > 0:
+                z_score = norm.ppf(1 - p_values[i,j,k] / 2)
+                z_scores[i, j, k] = z_score if correlations[i, j, k] >= 0 else -z_score
 
 
-#apply gmmask to calculated coefficients
-correl_brain = np.where(gmmask, correlations, np.nan)
+#apply gmmask to calculated zscores
+zscore_brain = np.where(gmmask, z_scores, np.nan)
 
 #create nifti of all coefficients
-correlations_nii = new_img_like('DST3050001/swFEOBV.nii', correlations)
-nib.save(correlations_nii, "voxel-based correlations unmasked.nii")
+z_scores_nii = new_img_like('DST3050001/swFEOBV.nii', zscore_brain)
+nib.save(z_scores_nii, "voxel-based correlations z-scores unmasked.nii")
 
 
 # Use a log scale for p-values
@@ -91,16 +95,16 @@ sig_p_mask_img = new_img_like(
 
 
 #apply mask to calculated coefficients
-cor_masked = np.where(bin_p_values_and_mask, correlations, np.nan)     
+zscore_masked = np.where(bin_p_values_and_mask, zscore_brain, np.nan)     
 
 
 #create nifti of significant coefficients
 
-sig_correlations = new_img_like('DST3050001/swFEOBV.nii', cor_masked)
+sig_zscores = new_img_like('DST3050001/swFEOBV.nii', zscore_masked)
 
 
 #generate mosiac plot of significant coefficients
-plotting.plot_stat_map(sig_correlations, display_mode="mosaic")
+plotting.plot_stat_map(sig_zscores, display_mode="mosaic")
 
 #export significant coefficients as nifti file
-nib.save(sig_correlations, "voxel-based correlation.nii")
+nib.save(sig_zscores, "voxel-based correlation z-scores.nii")
