@@ -22,7 +22,7 @@ data_path = '/home/jason/Study_data/Down Syndrome/TRCDS/Raw_images/DSCHOL-A003-2
 os.chdir(data_path)
 
 
-# Load fMRI images
+# Load PET images
 FEOBV_img_paths = [
     'DST3050001/swFEOBV.nii', 'DST3050002/swFEOBV.nii',
     'DST3050003/swFEOBV.nii', 'DST3050012/swFEOBV.nii',
