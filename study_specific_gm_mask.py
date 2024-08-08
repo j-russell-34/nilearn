@@ -12,6 +12,7 @@ import nibabel as nib
 import os
 import numpy as np
 from scipy.ndimage import binary_dilation
+from scipy.ndimage import binary_erosion
 
 #Set path where data is stored
 data_path = '/home/jason/Study_data/Down Syndrome/TRCDS/Raw_images/DSCHOL-A003-2024-07-15a/DATA'
@@ -54,12 +55,15 @@ for i in range(rsdim1):
                 
 
 dil_gm_mask = binary_dilation(prob_mask)
+dilero_gm_mask = binary_erosion(dil_gm_mask)
+dilerodil_gm_mask = binary_dilation(dilero_gm_mask)
+dilerodilero_gm_mask = binary_erosion(dilerodil_gm_mask)
 
-dil_mask_gm_nii = new_img_like(
-    'DST3050001/swFEOBV.nii', dil_gm_mask.astype(int)
+mask_gm_nii = new_img_like(
+    'DST3050001/swFEOBV.nii', dilerodilero_gm_mask.astype(int)
 )
 
-nib.save(dil_mask_gm_nii, "study_specific_GM_mask_prob0.3.nii")
+nib.save(mask_gm_nii, "study_specific_GM_mask_prob0.3.nii")
             
 
 
