@@ -20,7 +20,10 @@ os.chdir(data_path)
 orig_file = 'orig.mgz'
 raw = ants.image_read(orig_file)
 
-extracted_raw = brain_extraction(raw, modality='t1')
+extracted_mask = brain_extraction(raw, modality='t1')
+
+# Apply the mask to the original MRI image
+masked_image = ants.mask_image(raw, extracted_mask)
 
 #produce NifTi
-ants.image_write(extracted_raw, "skull_stripped.nii.gz")
+ants.image_write(masked_image, "skull_stripped.nii.gz")
