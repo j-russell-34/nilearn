@@ -38,10 +38,6 @@ trcds_img = image.concat_imgs([os.path.join(data_path, img) for img in trcds_img
 # Load Control images to 4d nifti
 control_img = image.concat_imgs([os.path.join(data_path, img) for img in control_img_paths])
 
-### Potentially do this in ANTsPy first with warp/smooth ###
-# filter images to generate matching voxelsizes
-    #check affine matches
-    
 # Count subjects for each group
 _, _, _, subjects_ds = trcds_img.shape
 _, _, _, subjects_cx = control_img.shape
@@ -55,7 +51,7 @@ unpaired_design_matrix = pd.DataFrame({
 all_imgs = image.concat_imgs([trcds_img, control_img])
 
 # second level model
-second_level_model = SecondLevelModel(mask_img=wbmask_path, n_jobs=2).fit(
+second_level_model = SecondLevelModel(mask_img=wbmask_path, n_jobs=1).fit(
     all_imgs, design_matrix=unpaired_design_matrix
     )
 

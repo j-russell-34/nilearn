@@ -55,7 +55,7 @@ gmmask_path = '/home/jason/Study_data/Down Syndrome/TRCDS/Raw_images/DSCHOL-A003
 
 #second level model
 second_level_model = SecondLevelModel(
-    mask_img=gmmask_path, n_jobs=2
+    mask_img=gmmask_path, n_jobs=1
 )
 second_level_model = second_level_model.fit(
     FEOBV_img_paths, design_matrix=design_matrix)

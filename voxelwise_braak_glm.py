@@ -63,19 +63,19 @@ gmmask_path = '/home/jason/Study_data/Down Syndrome/TRCDS/Raw_images/DSCHOL-A003
 
 #second level model
 second_level_model_b12 = SecondLevelModel(
-    mask_img=gmmask_path, n_jobs=2
+    mask_img=gmmask_path, n_jobs=1
 )
 second_level_model_b12 = second_level_model_b12.fit(
     FEOBV_img_paths, design_matrix=design_matrix12)
 
 second_level_model_b34 = SecondLevelModel(
-    mask_img=gmmask_path, n_jobs=2
+    mask_img=gmmask_path, n_jobs=1
 )
 second_level_model_b34 = second_level_model_b34.fit(
     FEOBV_img_paths, design_matrix=design_matrix34)
 
 second_level_model_b56 = SecondLevelModel(
-    mask_img=gmmask_path, n_jobs=2
+    mask_img=gmmask_path, n_jobs=1
 )
 second_level_model_b56 = second_level_model_b56.fit(
     FEOBV_img_paths, design_matrix=design_matrix56)
