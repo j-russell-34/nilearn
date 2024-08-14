@@ -36,7 +36,7 @@ cluster_thres = -np.log10(0.05)
 
 #set number of permutations for non-parametric inference (10000 when finalized
 # but adds compute time, 500 for running on computer)
-permutations = 500
+permutations = 10000
 
 
 # Load fMRI images
