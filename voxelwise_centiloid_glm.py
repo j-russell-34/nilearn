@@ -156,7 +156,8 @@ plotting.plot_stat_map(
 
 
 
-fig.suptitle("Association Between Centiloid Value and FEOBV uptake")
+fig.suptitle("Association Between Centiloid Value and FEOBV uptake", fontsize=16,
+			 weight='bold')
 
 
 pdf.savefig(f'{output_path}/{pdf_filename}', dpi=300)
