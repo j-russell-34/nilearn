@@ -33,7 +33,7 @@ cluster_thres = -np.log10(0.05)
 
 #set number of permutations for non-parametric inference (10000 when finalized
 # but adds compute time, 500 for running on computer)
-permutations = 50
+permutations = 10000
 
 #import age
 age_ds_df = pd.read_csv('/home/jason/Study_data/Down Syndrome/TRCDS/DSCHOL_dems_test1.csv')
