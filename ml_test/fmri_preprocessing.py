@@ -1,40 +1,57 @@
-import nipype.interfaces.io as nio
+from nipype.interfaces.io import SelectFiles, DataSink
 from nipype.interfaces.spm import Realign, SliceTiming, Coregister, NewSegment, Normalize12, Smooth
-from nipype import Node, Workflow, MapNode
-import nipype.interfaces.utility as util
+from nipype import Node, Workflow
 from nipype.algorithms.misc import Gunzip
 import os
+from os.path import join as opj
 import glob
 from nipype.interfaces.freesurfer import MRIConvert
+from nipype import IdentityInterface
+import shutil
 
-anat_scans = []
-func_scans = []
+
+subject_list = ['1020', '1026', '2040','2042']
+
+infosource = Node(IdentityInterface(fields=['subject_id']), name="infosource")
+infosource.iterables = [('subject_id', subject_list)]
 
 in_dir = '/home/jason/INPUTS/test_data'
 
 for subject in sorted(os.listdir(in_dir)):
+	if not os.path.exists(f'{in_dir}/{subject}/scans'):
+		os.mkdir(f'{in_dir}/{subject}/scans')
+	else:
+		print('Directory exists, continue')
 	anat = glob.glob(f'{in_dir}/{subject}/{subject}_MR1/assessors/*FS7_v1*/{subject}/*FS7_v1*/out/SUBJ/mri/orig.mgz')[0]
-	anat_scans.append(anat)
+	shutil.copy(anat, f'{in_dir}/{subject}/scans/orig.mgz')
 	func = f'{in_dir}/{subject}/{subject}_MR1/scans/801/fMRI_REST1.nii.gz'
-	func_scans.append(func)
+	shutil.copy(func, f'{in_dir}/{subject}/scans/fMRI_REST1.nii.gz')
+	
+anat_file = opj('{subject_id}','scans','orig.mgz')
+func_file = opj('{subject_id}','scans','fMRI_REST1.nii.gz')
 
-inputnode = Node(util.IdentityInterface(fields=["in_file"]), name ="inputnode")
-inputnode.inputs.in_file = func_scans
+templates = {
+	'anat': anat_file,
+	'func': func_file
+	}
 
-inputnodeanat = Node(util.IdentityInterface(fields=["in_file"]), name ="inputnodeanat")
-inputnodeanat.inputs.in_file = anat_scans
+selectfiles = Node(SelectFiles(templates, 
+							   base_directory='/home/jason/INPUTS/test_data'),
+				   name="selectfiles")
+
 
 from nipype.interfaces.matlab import MatlabCommand
 MatlabCommand.set_default_paths('/home/jason/matlab_pkg/spm12')
 
 #gunzip
-gunzip_func = MapNode(Gunzip(), name='gunzip_func', iterfield=['in_file'])
-gunzip_anat = MapNode(Gunzip(), name='gunzip_anat', iterfield=['in_file'])
+gunzip_func = Node(Gunzip(), name='gunzip_func')
+gunzip_anat = Node(Gunzip(), name='gunzip_anat')
 
 #preprocess fMRI images using SPM
 # Realign motion correction
 realigner = Node(interface=Realign(), name = 'realign')
 realigner.inputs.register_to_mean = True
+realigner.inputs.jobtype = 'estwrite'
 
 # slice timing correction
 slice_time = Node(SliceTiming(), name="slice_time")
@@ -46,8 +63,7 @@ slice_time.inputs.ref_slice = 30
 
 # coregistration 
 
-coreg = MapNode(Coregister(), iterfield=['target', 'apply_to_files'], name="coreg")
-coreg.inputs.jobtype = 'estimate'
+coreg = Node(Coregister(), name="coreg")
 
 # segmentation
 tpm_img = '/home/jason/matlab_pkg/spm12/tpm/TPM.nii'
@@ -62,40 +78,42 @@ tissues = [tissue1, tissue2, tissue3, tissue4, tissue5, tissue6]
 segmentation = Node(NewSegment(tissues=tissues), name="segmentation")
 
 # create node to convert mgz to nii
-mri_convert = MapNode(MRIConvert(), name='mri_convert', iterfield=['in_file'])
+mri_convert = Node(MRIConvert(), name='mri_convert')
 
 # normalization
 normalization = Node(Normalize12(), name="normalization")
-normalization.inputs.tpm = '/home/jason/matlab_pkg/spm12/tpm/TPM.nii'
 
 # smooth
 smooth = Node(interface=Smooth(), name="smooth")
-smooth.inputs.fwhm = 4
+smooth.inputs.fwhm = 6
 
 #datasink
-datasink = Node(nio.DataSink(base_directory='/home/jason/OUTPUTS/ml_test'),
+datasink = Node(DataSink(base_directory='/home/jason/OUTPUTS/ml_test'),
 				name = 'datasink')
 
 preproc = Workflow(name='preproc', base_dir = '/home/jason/OUTPUTS/ml_test')
 
+
 preproc.connect([
-	(inputnode,gunzip_func, [('in_file', 'in_file')]),
-	(gunzip_func, realigner, [('out_file','in_files')]),
+	(infosource, selectfiles, [('subject_id', 'subject_id')]),
+	(selectfiles, gunzip_func, [('func', 'in_file')]),
+	(gunzip_func, realigner, [('out_file', 'in_files')]),
 	(realigner, slice_time, [('realigned_files', 'in_files')]),
-	(inputnodeanat, mri_convert, [('in_file', 'in_file')]),
+	(selectfiles, mri_convert, [('anat', 'in_file')]),
 	(mri_convert, gunzip_anat, [('out_file', 'in_file')]),
-	(gunzip_anat, segmentation, [('out_file', 'channel_files')]),
-	(gunzip_anat, coreg, [('out_file', 'target')]),
-	(realigner, coreg, [('mean_image', 'source')]),
-	(slice_time, coreg,[('timecorrected_files', 'apply_to_files')]),
+	(gunzip_anat, coreg, [('out_file', 'source')]),
+	(realigner, coreg, [('mean_image', 'target')]),
+	(gunzip_anat, coreg, [('out_file', 'apply_to_files')]),
+	(coreg, segmentation, [('coregistered_files', 'channel_files')]),
 	(segmentation, normalization, [('forward_deformation_field', 'deformation_file')]),
-	(realigner, normalization, [('mean_image', 'image_to_align')]),
-	(coreg, normalization, [('coregistered_files', 'apply_to_files')]),
-	(normalization, smooth,[('normalized_files', 'in_files')]),
+	(coreg, normalization, [('coregistered_files', 'image_to_align')]),
+	(slice_time, normalization, [('timecorrected_files', 'apply_to_files')]),
+	(normalization, smooth, [('normalized_files', 'in_files')]),
 	(smooth, datasink, [('smoothed_files', 'smoothed')]),
+	(coreg, datasink, [('coregistered_files', 'coregistered')]),
 	(normalization, datasink, [('normalized_files', 'normalized')]),
 	(segmentation, datasink, [('bias_corrected_images', 'bias_corrected')]),
 	(realigner, datasink, [('realignment_parameters', 'realignment_parameters')])
-	 ])
+])
 
-preproc.run('MultiProc', plugin_args={'n_procs': 4})
+preproc.run('MultiProc', plugin_args={'n_procs': 8})
