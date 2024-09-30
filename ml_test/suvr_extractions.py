@@ -1,7 +1,7 @@
 # -*- coding: utf-8 -*-
 
 import os
-from nilearn import image, masking, plotting, datasets
+from nilearn import image, datasets
 import nibabel as nib
 import pandas as pd
 import glob
