@@ -1,14 +1,15 @@
 import os
 from nilearn import datasets
 import glob
-from sklearn.model_selection import train_test_split
 import pandas as pd
 from nilearn.input_data import NiftiLabelsMasker
-from sklearn.metrics import r2_score
+from sklearn.model_selection import GridSearchCV, train_test_split
 from nilearn.connectome import ConnectivityMeasure
 from sklearn.multioutput import MultiOutputRegressor
 import numpy as np
 from sklearn.linear_model import Ridge
+from sklearn.metrics import r2_score
+import joblib
 
 
 in_dir = '/home/jason/INPUTS/test_data'
@@ -55,21 +56,35 @@ fmri_features = np.array(fmri_features)
 X = fmri_features 
 y = amyloid_suvrs 
 
-# Split the data into training and test sets
-X_train, X_test, y_train, y_test = train_test_split(X, y, test_size=0.25, random_state=42)
+#train test split
+X_train, X_test, y_train, y_test = train_test_split(X, y, test_size=0.2, random_state=42)
+
+#setup hyperparameter tuning
+param_grid = {
+    'estimator__alpha': [0.1, 1.0, 10.0, 100.0]
+}
+
 
 print("Data prepared, fitting ML model")
 # Multi-Output Ridge Regression
-model = MultiOutputRegressor(Ridge(alpha=1.0))
-model.fit(X_train, y_train)
-
-
-
+model = MultiOutputRegressor(Ridge())
+grid_search = GridSearchCV(model, param_grid, cv=3, scoring='r2', verbose=1, n_jobs=-1)
 print('Running test on ML model')
-# Predict amyloid SUVRs on the test set using X_test (fMRI files)
-y_pred = model.predict(X_test)
+grid_search.fit(X_train, y_train)
 
-# Evaluate the performance on the test set
+# Get the best model and its hyperparameters
+best_model = grid_search.best_estimator_
+best_params = grid_search.best_params_
+print(f"Best Hyperparameters: {best_params}")
 
-print(f'R-squared: {r2_score(y_test, y_pred, multioutput="uniform_average")}')
+# Get the best hyperparameters and the best cross-validated score
+print(f"Best Hyperparameters: {grid_search.best_params_}")
+print(f"Best Cross-validated R-squared: {grid_search.best_score_}")
 
+#Evaluate the best model on the test set
+y_pred = best_model.predict(X_test)
+r_squared = r2_score(y_test, y_pred, multioutput='uniform_average')
+print(f"Test R-squared: {r_squared}")
+
+# Save the trained model to a file
+joblib.dump(best_model, f'{out_dir}/trained_model.pkl')
